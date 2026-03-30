@@ -1,41 +1,27 @@
-import * as readline from 'node:readline/promises';
-import { stdin, stdout } from 'node:process';
-import { execFile } from 'node:child_process';
-import { platform } from 'node:os';
-import { getConfig } from './config.js';
-import { parseAddress, fetchBalances } from './balances.js';
-import { fetchPoolData, fetchPrices } from './pools.js';
-import {
-  selectBestPool,
-  computeBestPoolResult,
-  computeSwapRecommendation,
-} from './strategy.js';
-import { buildCowSwapUrl, buildUniswapLpUrl } from './urls.js';
-import type { PriceData, TokenBalance } from './types.js';
+import * as readline from "node:readline/promises";
+import { stdin, stdout } from "node:process";
+import { execFile } from "node:child_process";
+import { platform } from "node:os";
+import { getConfig } from "./config.js";
+import { parseAddress, fetchBalances } from "./balances.js";
+import { fetchPoolData, fetchPrices } from "./pools.js";
+import { selectBestPool, computeBestPoolResult, computeSwapRecommendation } from "./strategy.js";
+import { buildCowSwapUrl, buildUniswapLpUrl } from "./urls.js";
+import type { PriceData, TokenBalance } from "./types.js";
 
 function openUrl(url: string): void {
-  const cmd =
-    platform() === 'darwin' ? 'open' :
-    platform() === 'win32' ? 'start' : 'xdg-open';
+  const cmd = platform() === "darwin" ? "open" : platform() === "win32" ? "start" : "xdg-open";
   execFile(cmd, [url]);
 }
 
 function fillValueUsd(balances: TokenBalance[], prices: PriceData): void {
   for (const b of balances) {
-    const price =
-      b.symbol === 'ETH'
-        ? prices.ethUsd
-        : b.symbol === 'USDC'
-          ? prices.usdcUsd
-          : prices.usdtUsd;
+    const price = b.symbol === "ETH" ? prices.ethUsd : b.symbol === "USDC" ? prices.usdcUsd : prices.usdtUsd;
     b.valueUsd = parseFloat(b.formatted) * price;
   }
 }
 
-function printTable(
-  title: string,
-  rows: Array<[string, string]>,
-): void {
+function printTable(title: string, rows: Array<[string, string]>): void {
   console.log(`\n=== ${title} ===`);
   const maxKey = Math.max(...rows.map(([k]) => k.length));
   for (const [key, value] of rows) {
@@ -50,7 +36,7 @@ async function main(): Promise<void> {
 
   let address: `0x${string}`;
   try {
-    const raw = await rl.question('Enter your Ethereum address: ');
+    const raw = await rl.question("Enter your Ethereum address: ");
     address = parseAddress(raw.trim());
   } finally {
     rl.close();
@@ -58,37 +44,37 @@ async function main(): Promise<void> {
 
   console.log(`\nFetching data for ${address}...\n`);
 
-  const [balances, pools, prices] = await Promise.all([
-    fetchBalances(address, config.rpcUrl),
-    fetchPoolData(),
-    fetchPrices(),
-  ]);
+  const [balances, pools, prices] = await Promise.all([fetchBalances(address, config.rpcUrl), fetchPoolData(), fetchPrices()]);
+
+  console.log(pools);
+  console.log(prices);
+  console.log(balances);
 
   fillValueUsd(balances, prices);
 
-  printTable('Token Balances', [
-    ['ETH', `${balances[0].formatted} ($${balances[0].valueUsd.toFixed(2)})`],
-    ['USDC', `${balances[1].formatted} ($${balances[1].valueUsd.toFixed(2)})`],
-    ['USDT', `${balances[2].formatted} ($${balances[2].valueUsd.toFixed(2)})`],
+  printTable("Token Balances", [
+    ["ETH", `${balances[0].formatted} ($${balances[0].valueUsd.toFixed(2)})`],
+    ["USDC", `${balances[1].formatted} ($${balances[1].valueUsd.toFixed(2)})`],
+    ["USDT", `${balances[2].formatted} ($${balances[2].valueUsd.toFixed(2)})`],
   ]);
 
   const totalValue = balances.reduce((s, b) => s + b.valueUsd, 0);
   console.log(`  Total value: $${totalValue.toFixed(2)}`);
 
   if (totalValue === 0) {
-    console.log('\nNo balance found. Nothing to do.');
+    console.log("\nNo balance found. Nothing to do.");
     return;
   }
 
   console.log(`\nFound ${pools.length} pools across v3/v4...`);
 
   if (pools.length === 0) {
-    console.log('No pool data available from DefiLlama. Try again later.');
+    console.log("No pool data available from DefiLlama. Try again later.");
     return;
   }
 
   printTable(
-    'Top Pools by APY',
+    "Top Pools by APY",
     [...pools]
       .sort((a, b) => b.apy - a.apy)
       .slice(0, 6)
@@ -101,15 +87,15 @@ async function main(): Promise<void> {
   const bestPool = selectBestPool(pools);
   const bestResult = computeBestPoolResult(bestPool, prices);
 
-  printTable('Selected Pool', [
-    ['Pair', bestPool.pair.label],
-    ['Version', bestPool.version],
-    ['APY', `${bestPool.apy.toFixed(2)}%`],
-    ['Fee Tier', `${(bestPool.feeTier / 10000).toFixed(2)}%`],
-    ['TVL', `$${(bestPool.tvlUsd / 1e6).toFixed(1)}M`],
-    ['Price Range', `${bestResult.minPrice.toFixed(2)} — ${bestResult.maxPrice.toFixed(2)}`],
-    ['Token A Ratio', `${(bestResult.tokenARatio * 100).toFixed(1)}%`],
-    ['Token B Ratio', `${(bestResult.tokenBRatio * 100).toFixed(1)}%`],
+  printTable("Selected Pool", [
+    ["Pair", bestPool.pair.label],
+    ["Version", bestPool.version],
+    ["APY", `${bestPool.apy.toFixed(2)}%`],
+    ["Fee Tier", `${(bestPool.feeTier / 10000).toFixed(2)}%`],
+    ["TVL", `$${(bestPool.tvlUsd / 1e6).toFixed(1)}M`],
+    ["Price Range", `${bestResult.minPrice.toFixed(2)} — ${bestResult.maxPrice.toFixed(2)}`],
+    ["Token A Ratio", `${(bestResult.tokenARatio * 100).toFixed(1)}%`],
+    ["Token B Ratio", `${(bestResult.tokenBRatio * 100).toFixed(1)}%`],
   ]);
 
   const swap = computeSwapRecommendation(bestPool, balances, prices);
@@ -117,40 +103,40 @@ async function main(): Promise<void> {
   if (swap.needed) {
     const cowUrl = buildCowSwapUrl(swap);
 
-    printTable('Step 1: Swap on CowSwap', [
-      ['Sell', `${swap.sellAmountFormatted} ${swap.sellToken.symbol}`],
-      ['Buy', swap.buyToken.symbol],
-      ['URL', cowUrl],
+    printTable("Step 1: Swap on CowSwap", [
+      ["Sell", `${swap.sellAmountFormatted} ${swap.sellToken.symbol}`],
+      ["Buy", swap.buyToken.symbol],
+      ["URL", cowUrl],
     ]);
 
-    console.log('\nOpening CowSwap...');
+    console.log("\nOpening CowSwap...");
     openUrl(cowUrl);
 
     const rl2 = readline.createInterface({ input: stdin, output: stdout });
-    await rl2.question('\nPress Enter after completing the swap to continue...');
+    await rl2.question("\nPress Enter after completing the swap to continue...");
     rl2.close();
   } else {
-    console.log('\nNo swap needed — you already have the right token ratio.');
+    console.log("\nNo swap needed — you already have the right token ratio.");
   }
 
   const lpUrl = buildUniswapLpUrl(bestResult);
 
-  printTable('Step 2: Create Uniswap LP Position', [
-    ['Pair', bestPool.pair.label],
-    ['Version', bestPool.version],
-    ['Fee', `${(bestPool.feeTier / 10000).toFixed(2)}%`],
-    ['Min Price', bestResult.minPrice.toFixed(2)],
-    ['Max Price', bestResult.maxPrice.toFixed(2)],
-    ['URL', lpUrl],
+  printTable("Step 2: Create Uniswap LP Position", [
+    ["Pair", bestPool.pair.label],
+    ["Version", bestPool.version],
+    ["Fee", `${(bestPool.feeTier / 10000).toFixed(2)}%`],
+    ["Min Price", bestResult.minPrice.toFixed(2)],
+    ["Max Price", bestResult.maxPrice.toFixed(2)],
+    ["URL", lpUrl],
   ]);
 
-  console.log('\nOpening Uniswap...');
+  console.log("\nOpening Uniswap...");
   openUrl(lpUrl);
 
-  console.log('\nDone! Review and confirm the position in your browser.');
+  console.log("\nDone! Review and confirm the position in your browser.");
 }
 
 main().catch((err) => {
-  console.error('Error:', err.message);
+  console.error("Error:", err.message);
   process.exit(1);
 });
