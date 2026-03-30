@@ -96,7 +96,7 @@ describe('computeSwapRecommendation', () => {
     ];
     const pool = makePool('ETH/USDC', 12);
     const rec = computeSwapRecommendation(pool, balances, prices, 0.10);
-    expect(rec.sellAmount).toBeLessThan(5);
+    expect(rec.sellAmount).toBeLessThan(1);
   });
 
   it('recommends swap when user only holds a third token not in the pool', () => {

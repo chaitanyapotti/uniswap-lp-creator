@@ -19,7 +19,6 @@ export const POOL_PAIRS: PoolPair[] = [
   { label: 'USDC/USDT', tokenA: TOKEN_INFO.USDC, tokenB: TOKEN_INFO.USDT },
 ];
 
-export const CHAIN_ID = 1;
 export const RANGE_PERCENT = 0.1;
 
 export function getConfig(): AppConfig {

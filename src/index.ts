@@ -1,6 +1,6 @@
 import * as readline from 'node:readline/promises';
 import { stdin, stdout } from 'node:process';
-import { exec } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { platform } from 'node:os';
 import { getConfig } from './config.js';
 import { parseAddress, fetchBalances } from './balances.js';
@@ -17,7 +17,7 @@ function openUrl(url: string): void {
   const cmd =
     platform() === 'darwin' ? 'open' :
     platform() === 'win32' ? 'start' : 'xdg-open';
-  exec(`${cmd} "${url}"`);
+  execFile(cmd, [url]);
 }
 
 function fillValueUsd(balances: TokenBalance[], prices: PriceData): void {
@@ -89,7 +89,7 @@ async function main(): Promise<void> {
 
   printTable(
     'Top Pools by APY',
-    pools
+    [...pools]
       .sort((a, b) => b.apy - a.apy)
       .slice(0, 6)
       .map((p) => [
