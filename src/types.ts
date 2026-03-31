@@ -39,13 +39,24 @@ export interface PriceData {
   usdtUsd: number;
 }
 
+export interface PoolFeeEstimate {
+  pool: PoolData;
+  feeRate: number;                  // e.g. 0.0005 for 0.05%
+  dailyPoolFeesUsd: number;        // total fees collected by pool per day
+  annualFeeYieldPct: number;       // (dailyPoolFees / tvl) * 365 * 100
+  estimatedDailyEarningsUsd: number;  // user's share based on position size
+  estimatedAnnualEarningsUsd: number;
+  volumeToTvlRatio: number;        // daily volume / TVL — liquidity efficiency
+}
+
 export interface BestPoolResult {
   pool: PoolData;
+  feeEstimate: PoolFeeEstimate;
   currentPrice: number;
   minPrice: number;
   maxPrice: number;
-  tokenARatio: number; // fraction of total value as tokenA (0-1)
-  tokenBRatio: number; // fraction of total value as tokenB (0-1)
+  tokenARatio: number;
+  tokenBRatio: number;
 }
 
 export interface SwapRecommendation {

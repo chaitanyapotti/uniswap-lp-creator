@@ -5,7 +5,7 @@ import { platform } from "node:os";
 import { getConfig } from "./config.js";
 import { parseAddress, fetchBalances } from "./balances.js";
 import { fetchPoolData, fetchPrices } from "./pools.js";
-import { selectBestPool, computeBestPoolResult, computeSwapRecommendation } from "./strategy.js";
+import { selectBestPool, computeBestPoolResult, computeSwapRecommendation, estimatePoolFeeYield } from "./strategy.js";
 import { buildCowSwapUrl, buildUniswapLpUrl } from "./urls.js";
 import type { PriceData, TokenBalance } from "./types.js";
 
@@ -69,26 +69,36 @@ async function main(): Promise<void> {
     return;
   }
 
+  const poolEstimates = [...pools]
+    .map((p) => ({ pool: p, estimate: estimatePoolFeeYield(p, totalValue) }))
+    .sort((a, b) => b.estimate.annualFeeYieldPct - a.estimate.annualFeeYieldPct);
+
   printTable(
-    "Top Pools by APY",
-    [...pools]
-      .sort((a, b) => b.apy - a.apy)
+    "Top Pools by Fee Yield (volume × fee / TVL)",
+    poolEstimates
       .slice(0, 6)
-      .map((p) => [
+      .map(({ pool: p, estimate: e }) => [
         `${p.pair.label} (${p.version}, ${(p.feeTier / 10000).toFixed(2)}%)`,
-        `APY: ${p.apy.toFixed(2)}%  TVL: $${(p.tvlUsd / 1e6).toFixed(1)}M`,
+        `Fee Yield: ${e.annualFeeYieldPct.toFixed(1)}%  Vol/TVL: ${e.volumeToTvlRatio.toFixed(2)}  24h Vol: $${(p.volumeUsd1d / 1e6).toFixed(1)}M  APY: ${p.apy.toFixed(1)}%`,
       ]),
   );
 
-  const bestPool = selectBestPool(pools);
-  const bestResult = computeBestPoolResult(bestPool, prices);
+  const bestPool = selectBestPool(pools, totalValue);
+  const bestResult = computeBestPoolResult(bestPool, prices, totalValue);
+  const fe = bestResult.feeEstimate;
 
   printTable("Selected Pool", [
     ["Pair", bestPool.pair.label],
     ["Version", bestPool.version],
-    ["APY", `${bestPool.apy.toFixed(2)}%`],
     ["Fee Tier", `${(bestPool.feeTier / 10000).toFixed(2)}%`],
     ["TVL", `$${(bestPool.tvlUsd / 1e6).toFixed(1)}M`],
+    ["24h Volume", `$${(bestPool.volumeUsd1d / 1e6).toFixed(1)}M`],
+    ["Vol/TVL", fe.volumeToTvlRatio.toFixed(2)],
+    ["Pool Daily Fees", `$${fe.dailyPoolFeesUsd.toFixed(0)}`],
+    ["Est. Fee Yield", `${fe.annualFeeYieldPct.toFixed(1)}% APR`],
+    ["DefiLlama APY", `${bestPool.apy.toFixed(2)}%`],
+    ["Your Est. Daily", `$${fe.estimatedDailyEarningsUsd.toFixed(2)}`],
+    ["Your Est. Annual", `$${fe.estimatedAnnualEarningsUsd.toFixed(2)}`],
     ["Price Range", `${bestResult.minPrice.toFixed(2)} — ${bestResult.maxPrice.toFixed(2)}`],
     ["Token A Ratio", `${(bestResult.tokenARatio * 100).toFixed(1)}%`],
     ["Token B Ratio", `${(bestResult.tokenBRatio * 100).toFixed(1)}%`],

@@ -1,5 +1,6 @@
 import type {
   PoolData,
+  PoolFeeEstimate,
   TokenBalance,
   PriceData,
   BestPoolResult,
@@ -7,11 +8,45 @@ import type {
 } from './types.js';
 import { RANGE_PERCENT } from './config.js';
 
-export function selectBestPool(pools: PoolData[]): PoolData {
+export function estimatePoolFeeYield(
+  pool: PoolData,
+  positionValueUsd: number,
+): PoolFeeEstimate {
+  const feeRate = pool.feeTier / 1_000_000;
+  const dailyPoolFeesUsd = pool.volumeUsd1d * feeRate;
+  const tvl = pool.tvlUsd > 0 ? pool.tvlUsd : 1;
+  const dailyFeeYield = dailyPoolFeesUsd / tvl;
+  const annualFeeYieldPct = dailyFeeYield * 365 * 100;
+  const userShare = positionValueUsd / tvl;
+  const estimatedDailyEarningsUsd = dailyPoolFeesUsd * userShare;
+  const estimatedAnnualEarningsUsd = estimatedDailyEarningsUsd * 365;
+  const volumeToTvlRatio = pool.volumeUsd1d / tvl;
+
+  return {
+    pool,
+    feeRate,
+    dailyPoolFeesUsd,
+    annualFeeYieldPct,
+    estimatedDailyEarningsUsd,
+    estimatedAnnualEarningsUsd,
+    volumeToTvlRatio,
+  };
+}
+
+export function selectBestPool(
+  pools: PoolData[],
+  positionValueUsd: number = 0,
+): PoolData {
   if (pools.length === 0) {
     throw new Error('No pools found. Cannot determine best pool.');
   }
-  return pools.reduce((best, pool) => (pool.apy > best.apy ? pool : best));
+  return pools.reduce((best, pool) => {
+    const bestEstimate = estimatePoolFeeYield(best, positionValueUsd);
+    const poolEstimate = estimatePoolFeeYield(pool, positionValueUsd);
+    return poolEstimate.annualFeeYieldPct > bestEstimate.annualFeeYieldPct
+      ? pool
+      : best;
+  });
 }
 
 export function computeTokenRatio(
@@ -170,6 +205,7 @@ export function computeSwapRecommendation(
 export function computeBestPoolResult(
   pool: PoolData,
   prices: PriceData,
+  positionValueUsd: number,
   rangePercent: number = RANGE_PERCENT,
 ): BestPoolResult {
   const priceA = getTokenPrice(pool.pair.tokenA.symbol, prices);
@@ -182,6 +218,15 @@ export function computeBestPoolResult(
     minPrice,
     maxPrice,
   );
+  const feeEstimate = estimatePoolFeeYield(pool, positionValueUsd);
 
-  return { pool, currentPrice, minPrice, maxPrice, tokenARatio, tokenBRatio };
+  return {
+    pool,
+    feeEstimate,
+    currentPrice,
+    minPrice,
+    maxPrice,
+    tokenARatio,
+    tokenBRatio,
+  };
 }

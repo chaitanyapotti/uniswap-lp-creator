@@ -3,6 +3,7 @@ import {
   selectBestPool,
   computeTokenRatio,
   computeSwapRecommendation,
+  estimatePoolFeeYield,
 } from '../src/strategy.js';
 import type { PoolData, TokenBalance, PriceData } from '../src/types.js';
 import { TOKEN_INFO } from '../src/config.js';
@@ -10,7 +11,7 @@ import { TOKEN_INFO } from '../src/config.js';
 const makePool = (
   label: string,
   apy: number,
-  version: 'v3' | 'v4' = 'v3',
+  overrides: Partial<PoolData> & { version?: 'v3' | 'v4' } = {},
 ): PoolData => ({
   pair: {
     label,
@@ -23,28 +24,80 @@ const makePool = (
         ? TOKEN_INFO.USDT
         : TOKEN_INFO.USDT,
   },
-  project: `uniswap-${version}`,
-  version,
+  project: `uniswap-${overrides.version ?? 'v3'}`,
+  version: overrides.version ?? 'v3',
   apy,
   apyBase: apy * 0.8,
-  tvlUsd: 10_000_000,
-  volumeUsd1d: 1_000_000,
-  volumeUsd7d: 7_000_000,
-  feeTier: 3000,
-  tickSpacing: 60,
+  tvlUsd: overrides.tvlUsd ?? 10_000_000,
+  volumeUsd1d: overrides.volumeUsd1d ?? 1_000_000,
+  volumeUsd7d: overrides.volumeUsd7d ?? 7_000_000,
+  feeTier: overrides.feeTier ?? 3000,
+  tickSpacing: overrides.tickSpacing ?? 60,
   defiLlamaSymbol: `WETH-USDC`,
 });
 
+describe('estimatePoolFeeYield', () => {
+  it('computes fee yield from volume, fee tier, and TVL', () => {
+    const pool = makePool('ETH/USDC', 10, {
+      volumeUsd1d: 5_000_000,
+      tvlUsd: 50_000_000,
+      feeTier: 3000,
+    });
+    const est = estimatePoolFeeYield(pool, 10_000);
+
+    expect(est.feeRate).toBeCloseTo(0.003);
+    expect(est.dailyPoolFeesUsd).toBeCloseTo(15_000);
+    expect(est.annualFeeYieldPct).toBeCloseTo((15_000 / 50_000_000) * 365 * 100, 1);
+    expect(est.volumeToTvlRatio).toBeCloseTo(0.1);
+    expect(est.estimatedDailyEarningsUsd).toBeCloseTo(15_000 * (10_000 / 50_000_000));
+    expect(est.estimatedAnnualEarningsUsd).toBeCloseTo(
+      15_000 * (10_000 / 50_000_000) * 365,
+    );
+  });
+
+  it('higher fee tier collects more fees on same volume', () => {
+    const low = makePool('ETH/USDC', 10, { feeTier: 500, volumeUsd1d: 2_000_000 });
+    const high = makePool('ETH/USDC', 10, { feeTier: 3000, volumeUsd1d: 2_000_000 });
+    const estLow = estimatePoolFeeYield(low, 10_000);
+    const estHigh = estimatePoolFeeYield(high, 10_000);
+
+    expect(estHigh.dailyPoolFeesUsd).toBeGreaterThan(estLow.dailyPoolFeesUsd);
+  });
+
+  it('low volume pool earns less despite high fee tier', () => {
+    const lowVol = makePool('ETH/USDC', 20, {
+      feeTier: 10000,
+      volumeUsd1d: 50_000,
+      tvlUsd: 5_000_000,
+    });
+    const highVol = makePool('ETH/USDC', 10, {
+      feeTier: 500,
+      volumeUsd1d: 50_000_000,
+      tvlUsd: 5_000_000,
+    });
+    const estLow = estimatePoolFeeYield(lowVol, 10_000);
+    const estHigh = estimatePoolFeeYield(highVol, 10_000);
+
+    expect(estHigh.estimatedAnnualEarningsUsd).toBeGreaterThan(
+      estLow.estimatedAnnualEarningsUsd,
+    );
+  });
+});
+
 describe('selectBestPool', () => {
-  it('picks the pool with the highest APY', () => {
-    const pools = [
-      makePool('ETH/USDC', 8.0),
-      makePool('ETH/USDT', 15.0),
-      makePool('USDC/USDT', 5.0),
-    ];
-    const best = selectBestPool(pools);
+  it('prefers higher fee yield over higher APY', () => {
+    const highApy = makePool('ETH/USDC', 30.0, {
+      volumeUsd1d: 100_000,
+      tvlUsd: 50_000_000,
+      feeTier: 500,
+    });
+    const highFeeYield = makePool('ETH/USDT', 10.0, {
+      volumeUsd1d: 20_000_000,
+      tvlUsd: 10_000_000,
+      feeTier: 3000,
+    });
+    const best = selectBestPool([highApy, highFeeYield], 10_000);
     expect(best.pair.label).toBe('ETH/USDT');
-    expect(best.apy).toBe(15.0);
   });
 
   it('throws when no pools available', () => {
