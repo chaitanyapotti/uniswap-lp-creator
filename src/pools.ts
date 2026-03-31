@@ -25,13 +25,19 @@ function matchPair(defiLlamaSymbol: string): PoolPair | undefined {
   return undefined;
 }
 
-function inferFeeTier(symbol: string): number {
-  const lower = symbol.toLowerCase();
-  if (lower.includes("usdc") && lower.includes("usdt")) return 100;
-  if (lower.includes("0.01")) return 100;
-  if (lower.includes("0.05")) return 500;
-  if (lower.includes("1.00") || lower.includes("1%")) return 10000;
-  return 3000;
+const POOL_META_TO_FEE: Record<string, number> = {
+  '0.01%': 100,
+  '0.05%': 500,
+  '0.08%': 800,
+  '0.30%': 3000,
+  '0.3%': 3000,
+  '1%': 10000,
+  '1.00%': 10000,
+};
+
+export function parsePoolMeta(poolMeta: string | null | undefined): number {
+  if (!poolMeta) return 3000;
+  return POOL_META_TO_FEE[poolMeta.trim()] ?? 3000;
 }
 
 export interface RawDefiLlamaPool {
@@ -44,6 +50,7 @@ export interface RawDefiLlamaPool {
   apyBase: number | null;
   volumeUsd1d: number | null;
   volumeUsd7d: number | null;
+  poolMeta: string | null;
 }
 
 export function parseDefiLlamaPools(raw: RawDefiLlamaPool[]): PoolData[] {
@@ -54,7 +61,7 @@ export function parseDefiLlamaPools(raw: RawDefiLlamaPool[]): PoolData[] {
       const pair = matchPair(p.symbol);
       if (!pair) return null;
       const version = p.project.endsWith("v4") ? "v4" : "v3";
-      const feeTier = inferFeeTier(p.symbol);
+      const feeTier = parsePoolMeta(p.poolMeta);
       return {
         pair,
         project: p.project,
