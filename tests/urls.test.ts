@@ -62,12 +62,20 @@ describe('buildUniswapLpUrl', () => {
     };
   };
 
-  it('builds correct Uniswap LP URL', () => {
+  it('builds correct Uniswap LP URL with version in path', () => {
     const url = buildUniswapLpUrl(makePoolResult());
-    expect(url).toContain('app.uniswap.org/positions/create');
+    expect(url).toContain('app.uniswap.org/positions/create/v3');
     expect(url).toContain('chain=ethereum');
     expect(url).toContain('currencyA=NATIVE');
     expect(url).toContain(TOKEN_INFO.USDC.address);
+  });
+
+  it('uses v4 path for v4 pools', () => {
+    const result = makePoolResult();
+    result.pool.version = 'v4';
+    result.pool.project = 'uniswap-v4';
+    const url = buildUniswapLpUrl(result);
+    expect(url).toContain('app.uniswap.org/positions/create/v4');
   });
 
   it('includes price range state with min and max prices', () => {

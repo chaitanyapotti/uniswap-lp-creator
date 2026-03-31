@@ -83,10 +83,10 @@ export function parseDexScreenerPrices(raw: any[]): PriceData {
     const quote = pair.quoteToken?.symbol?.toUpperCase();
 
     if (base === "WETH" || base === "ETH") {
-      ethUsd = ethUsd || pair.priceUsd;
+      ethUsd = parseFloat(pair.baseToken?.priceUsd || pair.priceUsd);
     }
     if (quote === "WETH" || quote === "ETH") {
-      ethUsd = ethUsd || pair.priceUsd;
+      ethUsd = parseFloat(pair.quoteToken?.priceUsd || pair.priceUsd);
     }
     if (base === "USDC") usdcUsd = parseFloat(pair.baseToken.priceUsd);
     if (base === "USDT") usdtUsd = parseFloat(pair.baseToken.priceUsd);

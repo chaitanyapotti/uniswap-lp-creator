@@ -49,6 +49,6 @@ export function buildUniswapLpUrl(result: BestPoolResult): string {
   params.set('chain', 'ethereum');
   params.set('step', '1');
 
-  const base = `https://app.uniswap.org/positions/create?${params.toString()}`;
+  const base = `https://app.uniswap.org/positions/create/${pool.version}?${params.toString()}`;
   return `${base}&fee=${fee}&priceRangeState=${priceRangeState}`;
 }

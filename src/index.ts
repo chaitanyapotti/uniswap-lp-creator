@@ -46,10 +46,6 @@ async function main(): Promise<void> {
 
   const [balances, pools, prices] = await Promise.all([fetchBalances(address, config.rpcUrl), fetchPoolData(), fetchPrices()]);
 
-  console.log(pools);
-  console.log(prices);
-  console.log(balances);
-
   fillValueUsd(balances, prices);
 
   printTable("Token Balances", [
