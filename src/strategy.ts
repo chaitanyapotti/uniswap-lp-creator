@@ -15,12 +15,17 @@ export function estimatePoolFeeYield(
   const feeRate = pool.feeTier / 1_000_000;
   const dailyPoolFeesUsd = pool.volumeUsd1d * feeRate;
   const tvl = pool.tvlUsd > 0 ? pool.tvlUsd : 1;
-  const dailyFeeYield = dailyPoolFeesUsd / tvl;
-  const annualFeeYieldPct = dailyFeeYield * 365 * 100;
-  const userShare = positionValueUsd / tvl;
-  const estimatedDailyEarningsUsd = dailyPoolFeesUsd * userShare;
-  const estimatedAnnualEarningsUsd = estimatedDailyEarningsUsd * 365;
   const volumeToTvlRatio = pool.volumeUsd1d / tvl;
+
+  // Use DefiLlama's apyBase (fees-only APY) when available; fall back to apy
+  // (which may include reward emissions). The naive `volume × fee / TVL`
+  // formula is a v2-era upper bound that massively overstates yields for
+  // concentrated v3/v4 liquidity, where most TVL sits outside the active tick.
+  const annualFeeYieldPct = pool.apyBase > 0 ? pool.apyBase : pool.apy;
+
+  const estimatedAnnualEarningsUsd =
+    positionValueUsd * (annualFeeYieldPct / 100);
+  const estimatedDailyEarningsUsd = estimatedAnnualEarningsUsd / 365;
 
   return {
     pool,

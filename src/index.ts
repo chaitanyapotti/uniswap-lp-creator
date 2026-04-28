@@ -74,12 +74,12 @@ async function main(): Promise<void> {
     .sort((a, b) => b.estimate.annualFeeYieldPct - a.estimate.annualFeeYieldPct);
 
   printTable(
-    "Top Pools by Fee Yield (volume × fee / TVL)",
+    "Top Pools by APY (DefiLlama)",
     poolEstimates
       .slice(0, 6)
       .map(({ pool: p, estimate: e }) => [
         `${p.pair.label} (${p.version}, ${(p.feeTier / 10000).toFixed(2)}%)`,
-        `Fee Yield: ${e.annualFeeYieldPct.toFixed(1)}%  Vol/TVL: ${e.volumeToTvlRatio.toFixed(2)}  24h Vol: $${(p.volumeUsd1d / 1e6).toFixed(1)}M  APY: ${p.apy.toFixed(1)}%`,
+        `APY: ${e.annualFeeYieldPct.toFixed(2)}%  TVL: $${(p.tvlUsd / 1e6).toFixed(2)}M  24h Vol: $${(p.volumeUsd1d / 1e6).toFixed(1)}M  Vol/TVL: ${e.volumeToTvlRatio.toFixed(2)}`,
       ]),
   );
 
@@ -91,15 +91,14 @@ async function main(): Promise<void> {
     ["Pair", bestPool.pair.label],
     ["Version", bestPool.version],
     ["Fee Tier", `${(bestPool.feeTier / 10000).toFixed(2)}%`],
-    ["TVL", `$${(bestPool.tvlUsd / 1e6).toFixed(1)}M`],
+    ["TVL", `$${(bestPool.tvlUsd / 1e6).toFixed(2)}M`],
     ["24h Volume", `$${(bestPool.volumeUsd1d / 1e6).toFixed(1)}M`],
     ["Vol/TVL", fe.volumeToTvlRatio.toFixed(2)],
     ["Pool Daily Fees", `$${fe.dailyPoolFeesUsd.toFixed(0)}`],
-    ["Est. Fee Yield", `${fe.annualFeeYieldPct.toFixed(1)}% APR`],
-    ["DefiLlama APY", `${bestPool.apy.toFixed(2)}%`],
+    ["DefiLlama APY", `${fe.annualFeeYieldPct.toFixed(2)}%${bestPool.apyBase > 0 ? " (apyBase)" : " (apy)"}`],
     ["Your Est. Daily", `$${fe.estimatedDailyEarningsUsd.toFixed(2)}`],
     ["Your Est. Annual", `$${fe.estimatedAnnualEarningsUsd.toFixed(2)}`],
-    ["Price Range", `${bestResult.minPrice.toFixed(2)} — ${bestResult.maxPrice.toFixed(2)}`],
+    ["Price Range", `${bestResult.minPrice.toFixed(4)} — ${bestResult.maxPrice.toFixed(4)}`],
     ["Token A Ratio", `${(bestResult.tokenARatio * 100).toFixed(1)}%`],
     ["Token B Ratio", `${(bestResult.tokenBRatio * 100).toFixed(1)}%`],
   ]);

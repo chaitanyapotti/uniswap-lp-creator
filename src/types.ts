@@ -43,8 +43,8 @@ export interface PoolFeeEstimate {
   pool: PoolData;
   feeRate: number;                  // e.g. 0.0005 for 0.05%
   dailyPoolFeesUsd: number;        // total fees collected by pool per day
-  annualFeeYieldPct: number;       // (dailyPoolFees / tvl) * 365 * 100
-  estimatedDailyEarningsUsd: number;  // user's share based on position size
+  annualFeeYieldPct: number;       // DefiLlama apyBase (fees) or apy fallback
+  estimatedDailyEarningsUsd: number;  // positionValueUsd × apy / 365
   estimatedAnnualEarningsUsd: number;
   volumeToTvlRatio: number;        // daily volume / TVL — liquidity efficiency
 }

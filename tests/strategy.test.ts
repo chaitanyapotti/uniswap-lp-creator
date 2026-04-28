@@ -37,7 +37,7 @@ const makePool = (
 });
 
 describe('estimatePoolFeeYield', () => {
-  it('computes fee yield from volume, fee tier, and TVL', () => {
+  it('uses DefiLlama apyBase for yield (not v2-style volume/TVL formula)', () => {
     const pool = makePool('ETH/USDC', 10, {
       volumeUsd1d: 5_000_000,
       tvlUsd: 50_000_000,
@@ -47,12 +47,21 @@ describe('estimatePoolFeeYield', () => {
 
     expect(est.feeRate).toBeCloseTo(0.003);
     expect(est.dailyPoolFeesUsd).toBeCloseTo(15_000);
-    expect(est.annualFeeYieldPct).toBeCloseTo((15_000 / 50_000_000) * 365 * 100, 1);
     expect(est.volumeToTvlRatio).toBeCloseTo(0.1);
-    expect(est.estimatedDailyEarningsUsd).toBeCloseTo(15_000 * (10_000 / 50_000_000));
-    expect(est.estimatedAnnualEarningsUsd).toBeCloseTo(
-      15_000 * (10_000 / 50_000_000) * 365,
-    );
+
+    // apyBase = apy * 0.8 = 8 (from makePool helper)
+    expect(est.annualFeeYieldPct).toBeCloseTo(8);
+    expect(est.estimatedAnnualEarningsUsd).toBeCloseTo(10_000 * 0.08);
+    expect(est.estimatedDailyEarningsUsd).toBeCloseTo((10_000 * 0.08) / 365);
+  });
+
+  it('falls back to apy when apyBase is zero', () => {
+    const pool = makePool('ETH/USDC', 25, { volumeUsd1d: 1_000_000, tvlUsd: 10_000_000 });
+    pool.apyBase = 0;
+    const est = estimatePoolFeeYield(pool, 10_000);
+
+    expect(est.annualFeeYieldPct).toBeCloseTo(25);
+    expect(est.estimatedAnnualEarningsUsd).toBeCloseTo(10_000 * 0.25);
   });
 
   it('higher fee tier collects more fees on same volume', () => {
@@ -64,39 +73,38 @@ describe('estimatePoolFeeYield', () => {
     expect(estHigh.dailyPoolFeesUsd).toBeGreaterThan(estLow.dailyPoolFeesUsd);
   });
 
-  it('low volume pool earns less despite high fee tier', () => {
-    const lowVol = makePool('ETH/USDC', 20, {
-      feeTier: 10000,
-      volumeUsd1d: 50_000,
-      tvlUsd: 5_000_000,
+  it('does NOT inflate the headline yield based on naive volume/TVL', () => {
+    // A USDC/USDT-like trap pool: huge volume, tiny TVL, 0.30% nominal fee.
+    // The v2 formula would produce >9000% APR; DefiLlama's apy reflects the
+    // realistic (much lower) concentrated-liquidity yield.
+    const trapPool = makePool('USDC/USDT', 16, {
+      feeTier: 3000,
+      volumeUsd1d: 10_800_000,
+      tvlUsd: 122_000,
     });
-    const highVol = makePool('ETH/USDC', 10, {
-      feeTier: 500,
-      volumeUsd1d: 50_000_000,
-      tvlUsd: 5_000_000,
-    });
-    const estLow = estimatePoolFeeYield(lowVol, 10_000);
-    const estHigh = estimatePoolFeeYield(highVol, 10_000);
+    const est = estimatePoolFeeYield(trapPool, 50_000);
 
-    expect(estHigh.estimatedAnnualEarningsUsd).toBeGreaterThan(
-      estLow.estimatedAnnualEarningsUsd,
-    );
+    // apyBase = 16 * 0.8 = 12.8; must NOT be the v2 figure (~9670%)
+    expect(est.annualFeeYieldPct).toBeLessThan(50);
+    expect(est.annualFeeYieldPct).toBeCloseTo(12.8);
   });
 });
 
 describe('selectBestPool', () => {
-  it('prefers higher fee yield over higher APY', () => {
-    const highApy = makePool('ETH/USDC', 30.0, {
-      volumeUsd1d: 100_000,
-      tvlUsd: 50_000_000,
-      feeTier: 500,
-    });
-    const highFeeYield = makePool('ETH/USDT', 10.0, {
+  it('prefers the pool with higher DefiLlama APY', () => {
+    // High volume/TVL ratio used to win under the v2 formula even with low APY;
+    // now selection is driven by DefiLlama's apyBase/apy.
+    const lowApyHighVolTvl = makePool('ETH/USDC', 10.0, {
       volumeUsd1d: 20_000_000,
       tvlUsd: 10_000_000,
       feeTier: 3000,
     });
-    const best = selectBestPool([highApy, highFeeYield], 10_000);
+    const highApy = makePool('ETH/USDT', 30.0, {
+      volumeUsd1d: 100_000,
+      tvlUsd: 50_000_000,
+      feeTier: 500,
+    });
+    const best = selectBestPool([lowApyHighVolTvl, highApy], 10_000);
     expect(best.pair.label).toBe('ETH/USDT');
   });
 
